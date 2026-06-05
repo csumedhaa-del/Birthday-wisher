@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>happy birthday</title>
+    <link rel="stylesheet" href="style.css"/>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    
+    <!--Google Font-->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Google+Sans:ital,opsz,wght@0,17..18,400..700;1,17..18,400..700&family=Roboto+Slab:wght@100..900&display=swap" rel="stylesheet">
+
+</head>
+<body>
+    
+    <div class="w-full bg-zinc-900">
+        <canvas class="fixed top-0 left-0 w-full h-screen" id="frame"></canvas>
+        <div class="parent relative top-0 left-0 w-full h-[700vh]"></div>
+    </div>
+    <div class="container">
+           <div id="birthdayText"></div>
+           <div class="cake-container">
+             <div class="cake" id="cake"></div>
+            </div>
+    </div>
+
+    <div class="screen">
+      <div class="left">
+          <h1>PHOTO BOOTH</h1>
+          <h2>MUMMA THROUGH THE YEARS</h2>
+      </div>
+
+      <div class="right">
+        <p><p class="hint">Drag to reveal more ↗</p></p>
+      <div class="stack">
+          <div class="paper paper13"></div>
+          <div class="paper paper12"></div>
+          <div class="paper paper11"></div>
+          <div class="paper paper10"></div>
+          <div class="paper paper9"></div>
+          <div class="paper paper8"></div>
+          <div class="paper paper7"></div>
+          <div class="paper paper6"></div>
+          <div class="paper paper5"></div>
+          <div class="paper paper4"></div>
+          <div class="paper paper3"></div>
+          <div class="paper paper2"></div>
+          <div class="paper paper1"></div>
+        </div>
+        </div>
+    </div>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.13.0/gsap.min.js" integrity="sha512-NcZdtrT77bJr4STcmsGAESr06BYGE8woZdSdEgqnpyqac7sugNO+Tr4bGwGF3MsnEkGKhU2KL2xh6Ec+BqsaHA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.13.0/ScrollTrigger.min.js" integrity="sha512-P2IDYZfqSwjcSjX0BKeNhwRUH8zRPGlgcWl5n6gBLzdi4Y5/0O4zaXrtO4K9TZK6Hn1BenYpKowuCavNandERg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="script.js"></script>
+
+    <script>
+        const params= new URLSearchParams(window.location.search);
+        const name= params.get("name")|| "friend";
+        let candleCount =parseInt(params.get("candles"))||4;
+        candleCount=Math.min(Math.max(candleCount,1),30);
+        const birthdayText=document.getElementById("birthdayText");
+        birthdayText.innerHTML=`
+        <div id="mailTitle">Blow Out the Candles!</div>
+        `;
+        const cake= document.getElementById("cake");
+        const colours = Array(6).fill("candle");
+        const cake_visual_width=200;
+        
+        function createCandles(count){
+            cake.innerHTML="";
+            const candle_visual_width=2;
+            const availableWidth=cake_visual_width;
+            const candlesperrow=6;
+            const rowCount= Math.ceil(count/ candlesperrow);
+            const shiftAmount=200;
+
+            for(let i=0; i<count; i++){
+                const candle= document.createElement("div");
+                candle.classList.add("candle");
+                const colourClass= colours[Math.floor(Math.random()*colours.length)];
+                candle.classList.add(colourClass);
+
+                const row= Math.floor(i/candlesperrow);
+                const col=i % candlesperrow;
+                const totalCandlesInRow= Math.min(
+                    candlesperrow,
+                    count-row*candlesperrow
+                );
+
+                const rowSpacing=availableWidth/(totalCandlesInRow+1);
+                const leftBase= rowSpacing* (col+1)- candle_visual_width/2+5;
+                const rowShift=row%2===0? 0:shiftAmount;
+
+                candle.style.position= "absolute";
+                candle.style.top=`${10+row*3}px`;
+                candle.style.left= `${leftBase- rowShift+ 40}px`;
+
+                cake.appendChild(candle);
+            }
+        }
+        createCandles(candleCount);
+
+        async function startMicDetection() {
+            try{
+                const stream= await navigator.mediaDevices.getUserMedia({
+                    audio:true,
+                });
+                const audioContext= new(window.AudioContext|| window.webkitAudioContext)();
+                const source= audioContext.createMediaStreamSource(stream);
+                const analyser=audioContext.createAnalyser();
+                analyser.fftSize=512;
+
+                source.connect(analyser);
+                const dataArray= new Uint8Array(analyser.frequencyBinCount);
+                let blown=false;
+                function detectBlow(){
+                  analyser.getByteFrequencyData(dataArray);
+                  
+                  let highFreqSum= 0;
+                  let lowFreqSum=0;
+
+                  const midpoint= dataArray.length/2;
+
+                  for(let i=0; i<dataArray.length; i++){
+                    
+                    if(i<midpoint){
+                        lowFreqSum +=dataArray[i];
+                    }else{
+                        highFreqSum+= dataArray[i];
+                    }
+
+                    }
+
+                    const highAvg= highFreqSum/ (dataArray.length/2);
+                    const lowAvg= lowFreqSum/(dataArray.length/2);
+
+                    const ratio=highAvg/ (lowAvg+1);
+                    const BLOW_RATIO_THRESHOLD=0.18;
+                    if(ratio> BLOW_RATIO_THRESHOLD && ratio<0.2 &&!blown){
+                        blown=true;
+                        blowOutCandles();
+                    }
+                    requestAnimationFrame(detectBlow);
+
+
+                    }
+                    detectBlow();
+                }
+                catch(err){
+                    console.error("mic access error:", err)
+                }
+                
+            }
+            
+        function blowOutCandles(){
+            const candles=document.querySelectorAll(".candle");
+            candles.forEach((candle)=>{
+                const delay =Math.random()*1000;
+                setTimeout(()=>{
+                    colours.forEach((color)=>{
+                        if(candle.classList.contains(color)){
+                            candle.classList.add("blown");
+                        }
+                    });
+            
+                }, delay);
+            });
+            console.log("detected");
+            setTimeout(()=>{
+                const subTitle=document.getElementById("subTitle");
+                subTitle.textContent='yayy!';
+            }, 1200);
+        }
+        startMicDetection();
+        const canvas=document.querySelector("canvas");
+
+        const context= canvas.getContext("2d") 
+
+
+        const frames={
+            currentIndex: 0,
+            maxIndex: 143
+        }
+
+        let imagesLoaded=0;
+        const images=[];
+        function preloadImages(){
+            for(var i=1; i<=frames.maxIndex; i++){
+                const imageUrl= `./frames/frame_${i.toString().padStart(4,"0")}.jpeg`
+                const img = new Image();
+                img.src=imageUrl;
+                img.onload=()=>{
+                    imagesLoaded++;
+                    if(imagesLoaded=== frames.maxIndex){
+                         loadImage(frames.currentIndex);
+                         startAnimation();
+                    }
+
+                }
+                images.push(img);
+            }
+            
+        }
+
+        function loadImage(index){
+            if(index>= 0 && index<= frames.maxIndex){
+               const img = images[index];  
+               canvas.width=window.innerWidth;
+               canvas.height= window.innerHeight;
+
+               const scaleX= canvas.width/img.width;
+               const scaleY= canvas.height/img.height; 
+               const scale= Math.max(scaleX, scaleY); 
+               
+               const newWidth=img.width*scale;
+               const newHeight= img.height*scale;
+               const offsetX=(canvas.width-newWidth) /2;
+               const offsetY=(canvas.height- newHeight) /2;
+
+               context.clearRect(0,0, canvas.width, canvas.height);
+               context.imageSmoothingEnabled=true;
+               context.imageSmoothingQuality="high";
+               context.drawImage(img, offsetX, offsetY, newWidth, newHeight);
+               frames.currentIndex=index;
+            }
+        };
+
+        function startAnimation(){
+            var tl=gsap.timeline({
+                scrollTrigger:{
+                    trigger:".parent",
+                    start:"top top",
+                    scrub: true,
+                    
+                    
+                }
+            }) 
+            tl.to(frames, {
+                currentIndex: frames.maxIndex,
+                onUpdate: function(){
+                    loadImage(Math.floor(frames.currentIndex))
+                },
+                onComplete: function(){
+                loadImage(frames.maxIndex); // freeze on last frame
+                }
+            })
+        }
+        preloadImages();
+    </script>
+</body>
+</html>
